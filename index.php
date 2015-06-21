@@ -1,75 +1,175 @@
 <?php
 session_start();
-unset($_SESSION['passwd']);
-unset($_SESSION['login']);
-$conn=mysql_connect("localhost", "user","123") or die ("Невозможно установить соединение: ".mysql_error());  
-mysql_query("set names 'cp1251',$conn");
-mysql_select_db("book");                        
-    if(isset($_GET['go']))    
-     {$_SESSION['login']=$_GET['login'];
-      $_SESSION['passwd']=$_GET['passwd'];
-      if ($_GET['login']=="pit" && $_GET['passwd']=="123")
-               {Header("Location: home.php");}
-               else {echo "<br>Проверьте правильность логина и пароля<br>"; }
-     }
-        if(!isset($_GET['go']) or $_GET['login']!="pit" or $_GET['passwd']!="123")
-        {
-?>
+unset($_SESSION["passwd"]);
+unset($_SESSION["login"]);
+include("connection.php");
+const FIELDS_NUMBER= 6;
+const FIELD_PERMISSION= 6;
+const FIELD_ID= 0;
+
+function CheckAuthorization()
+{
+	global $conn;
+	if(isset($_GET["go"])) {
+        $login = mysql_real_escape_string($_GET["login"]);
+		$password = $_GET["passwd"];
+		$zpassword=md5($password);
+		if (preg_match("/[0-9A-Za-z]/",$login)){
+			$sql = $conn->prepare("SELECT password FROM book.login WHERE login= \"$login\" ");  
+            $sql->execute();
+			$sql->setFetchMode(PDO::FETCH_ASSOC);  	  
+		while ($row = $sql->fetch()){
+            $truepassword=$row["password"];
+		}    
+        if($truepassword==$zpassword) { 
+		    $_SESSION["login"] = $_GET["login"];
+            $_SESSION["passwd"] = $_GET["passwd"];
+		    return true;
+		} else {
+	         echo "Ошибка ввода имени или пароля \n";
+		  }
+		} else {
+			echo "логин не соответствует зарегистрированным";
+		}	
+    }	 
+}
+?>        
+
 <html>
-<head> <title> Личная библиотека книг</title> </head>
-<body>
-<h2>Личная библиотека книг </h2>
- Авторизация 
-
-</body></html>
-        <form action="index.php"> Login: <input type=text name=login>
-                   Password: <input type=password name=passwd>
-                           <input type=submit name=go value=Go> </form>
-  <?      } ?>
-
-
-<?php 
-$table_name="mybooks";
-  $list_f=mysql_list_fields("book", "mybooks",$conn); //список полей
-  $n=mysql_num_fields($list_f);                       //число полей
-   for($j=1; $j<$n;$j++)
-   {$names[]=mysql_field_name($list_f, $j);}          // массив с именами полей
-$sql="SELECT title, author, date, cover, download, permission FROM $table_name ORDER BY date DESC";
-$q=mysql_query($sql,$conn) or die();
-$m=mysql_num_rows($q);                                 // число строк в таблице
-echo "&nbsp; <TABLE BORDER=0 CELLSPACING=0 width=90% align=centre><tr><TD BGCOLOR='#005533' align=centre> <font color='#FFFFFF'> <b> $table_name</b></font></td></tr></TABLE>";
-echo "<table cellspacing=0 cellspacing=1 border=1 width=90% align=centre";
-echo "<tr>";
-for ($i=0;$i<($n-2);$i++){ $val=$names[$i]; echo "<th ALIGN=CENTER BGCOLOR='#C2E3B6'><font size=2>$val</font></th>";}  //строка с названиями
-echo "</tr>"; 
-
-for ($i=0;$i<$m;$i++){
-	echo "<tr>";
-      for($k=0; $k<($n-2);$k++)	
-	   {$value= mysql_result($q,$i,$k); $val=$names[$k];
-	    if ($val=='cover') {$str="<td> <font size=2>&nbsp;"; 
-	                       $str.="<img src=\"http://test1.ru/"; 
-						   $str.="$value"; 
-						   $str.= " \" width=100 height=150 />"; 
-						   $str.="</font></td>"; echo $str;}  
-	      else {  if ($val=='download') {if (mysql_result($q,$i,5)=='1')
-		                                                               {$str="<td> <font size=2>&nbsp; ";
-																	    $str.="<a href=\"http://test1.ru/";
-																		$str.="$value"; 
-																		$str.=" \"download> download </a> ";
-																		$str.="</font></td>" ;} 
-								         else {$str="<td> <font size=2>&nbsp;  </font></td>";};
-		                                 echo $str;
-										 } 
-		          else {echo "<td> <font size=2>&nbsp; $value </font></td>";}
-		       }
-	   }
-	   
-	echo "</tr>";
+ <head> 
+  <title> Личная библиотека книг </title> 
+   <style type="text/css">
+    table {
+         border-style: none; 
+         width: 90%;		 
+    }
+    table td { 
+		background-color: #005533; 
+    }
+	table td font{
+		color: #FFFFFF;
 	}
-echo "</table>";
+	table.A {
+		background-color: #FFFFFF;
+		border-style: solid;	
+		width: 90%;
+	}
+	table.A th {
+        background-color: #C2E3B6;
+		align: center;
+		border: solid;
+    }
+	table.A td font{
+		size: 15;
+		
+	}
+  </style>
+ </head>
+ <body>
+  <h2> Личная библиотека книг </h2>
 
+<?php
+
+$table_name="mybooks";   
+$names = array("id", "title", "author", "date", "cover", "download", "permission", "login");
+
+    if(!isset($_GET["go"]) or !CheckAuthorization()) {
+?>           
+            Авторизация 
+            <form action="index.php"> Login: <input type=text name=login>
+                                  Password: <input type=password name=passwd>
+                                         <input type=submit name=go value=Go> </form>
+<?php       
+			$sql = $conn->prepare("SELECT * FROM $table_name ORDER BY date DESC");  
+            $sql->execute();
+			$sql->setFetchMode(PDO::FETCH_ASSOC);  
+			echo "<TABLE> <tr> <TD>  <font> <b> $table_name</b> </font> </td> </tr> </TABLE>";
+            echo "<table CLASS=A <tr>";
+            for ($i=1;$i<FIELDS_NUMBER;$i++) {       //шапка таблицы  
+			        $val=$names[$i]; echo "<th CLASS =A><font>$val</font></th>";
+			}
+            echo "</tr>"; 
+			while($row = $sql->fetch()) {
+        	        echo "<tr>";
+                    for($k=1; $k<FIELDS_NUMBER;$k++) {
+						    $val=$names[$k];
+							$value = $row[$val];     
+							if ($val=="cover"){
+									$str="<td CLASS=A> <font size=2>&nbsp;"; 
+            	                    $str.="<img src= \"http://test1.ru/img_pit/$value";  
+						            $str.= "\" width=100 height=150 />"; 
+						            $str.="</font></td>"; echo $str;
+							} else {  
+							        if ($val=="download") {
+											if($row["permission"]=="1") {
+													$str="<td> <font size=2>&nbsp; ";
+													$str.="<a href=\"http://test1.ru/book_pit/$value"; 
+													$str.=" \"download> download </a> ";
+													$str.="</font></td>" ;
+												} else {
+													$str="<td> <font size=2>&nbsp; </font></td>";
+												};
+		                                    echo $str;
+									} else { 
+									    echo "<td> <font size=2>&nbsp; $value </font></td>";
+									  }
+		                      }
+	                    }
+	                echo "</tr>";
+                }
+            echo "</table>";
+        } else {  
+		    $str = "<a href=\"add.php\" title=\"создать новую книгу\"> Добавить книгу</a> 
+			        <p align=\"center\"> <a href=\"index.php\" > Выход</a> </p>"; 
+			echo $str;
+		    $login=mysql_real_escape_string($_GET["login"]);
+			if (preg_match("/[0-9A-Za-z]/",$login)) {
+			    $sql = $conn->prepare("SELECT * FROM $table_name WHERE login = \"$login\" ORDER BY date DESC");  
+                $sql->execute();
+			    $sql->setFetchMode(PDO::FETCH_ASSOC); 
+			}
+            echo "<TABLE><tr><TD> <font> <b> $table_name</b></font></td></tr></TABLE>";
+            echo "<table>";
+            echo "<tr>";
+            for ($i=1;$i<FIELDS_NUMBER;$i++){
+				$val=$names[$i]; echo "<th><font>$val</font></th>";
+			}  //строка с названиями
+            echo "<th><font> edit </font></th> </tr>";
+            while($row = $sql->fetch()){
+        	    echo "<tr>";
+                for($k=1; $k<FIELDS_NUMBER;$k++) {	
+					 $val=$names[($k)];
+					 $value = $row[$val];  
+	                 if ($val=="cover") {
+				    	$str="<td> <font size=2>&nbsp;"; 
+            	        $str.="<img src= \"http://test1.ru/img_$login/$value";  
+						$str.= " \" width=100 height=150 />"; 
+				    	$str.="</font></td>"; echo $str;
+			        } else {
+				    	if ($val=="download") {
+						    if ($row["permission"]=="1") {
+		                        $str="<td> <font size=2>&nbsp; ";
+				                $str.="<a href=\"http://test1.ru/book_$login/$value"; 
+					            $str.=" \" download> download </a> ";
+					            $str.="</font></td>" ;
+					        }  else {
+						         $str="<td> <font size=2>&nbsp;  </font></td>";
+						       };
+		                    echo $str;
+					    } else {
+					         echo "<td> <font size=2>&nbsp; $value </font></td>";
+				          }
+		              }
+	            }
+	            $id=$row["id"]; echo "<td> <font size=2>&nbsp; <a href= \"edit.php?idd=$id\"  > редактировать </a> </font></td>";  
+	            echo "</tr>";
+	        }
+            echo "</table>";
+          }
 ?>
+</body></html>
+  
+  
 
 
 
