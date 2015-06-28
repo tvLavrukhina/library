@@ -1,64 +1,48 @@
 <?php
 session_start();
 include("connection.php");
+include("upload.php");
 
-function FileSizeOk()
-{
-	if ($_FILES["userfile"]["size"][0]< 1024*5*1024 &&  $_FILES["userfile"]["size"][1]<1024*5*1024) {
-	    return true;  
-	} else {
-		echo "Размер загружаемых файлов превышает допустимые <br>";
-	}
-}
-
-function FileImage()
-{   
-	if($_FILES["userfile"]["type"][0] != "image/jpeg" && $_FILES["userfile"]["type"][0] != "image/png") {
-             echo "Sorry, we only allow uploading JPG or PNG images";
-        }  else {
-		    return true;
-	    }
-}
-
- echo "<a href=\"index.php\" > на главную </a>";
+    echo "<a href=\"index.php\" > РЅР° РіР»Р°РІРЅСѓСЋ </a>";
     if(!isset($_POST["add"])) {
         echo  "<form enctype =\"multipart/form-data\" action =\"add.php\" method=\"post\">           
-                  Название книги: <input type=\"text\" name=\"title\" required=\"required\" /> <br><br>
-                  Автор: <input type=\"text\" name=\"author\" required=\"required\" />  <br> <br>
-                  Дата прочтения:<input type=\"date\" name= \"date\" required=\"required\" /><br> <br>			  
-				  Обложка: <input type=\"file\" name= \"userfile[]\" required=\"required\" /><br> <br>
-
-				  файл с книгой:<input type=\"file\" name=\"userfile[]\" required=\"required\"/><br> <br>
-				  Разрешить скачивание: <input type=checkbox name= \"permission\"><br>
-				                    <input type=submit name=add value=\"Добавить\"> 
-				   </form>";
-	}	else {
-            $title = mysql_real_escape_string($_POST["title"]);  
-            $author = mysql_real_escape_string($_POST["author"]);
-            $date = mysql_real_escape_string($_POST["date"]); 
-			$login = mysql_real_escape_string($_SESSION["login"]);  
-            if (FileSizeOk() && FileImage()) {
-	            $uploaddir = $_SERVER["DOCUMENT_ROOT"];
-                $destination_cover = $uploaddir ."/img_".$login."/".date(U).$_FILES["userfile"]["name"][0];  
-				$cover = date(U).$_FILES["userfile"]["name"][0];              
-				move_uploaded_file($_FILES["userfile"]["tmp_name"][0], $destination_cover);
-                $destination_book = $uploaddir ."/book_".$login."/".date(U).$_FILES["userfile"]["name"][1];   
-				$download = date(U).$_FILES["userfile"]["name"][1];
-                move_uploaded_file($_FILES["userfile"]["tmp_name"][1], $destination_book);
-                if($_POST["permission"]=="on"){
-					$permission="1";
-				} else {
-					$permission="0";
-				} 
-				if (preg_match("/[0-9A-Za-z]/",$login)) {
-				$sql = $conn->prepare("INSERT INTO book.mybooks (id, title, author, date, cover, download, permission, login) 
-                                                VALUES (NULL, \"$title\", \"$author\", \"$date\", \"$cover\", \"$download\", \"$permission\", \"$login\")");  
-                $sql->execute();
-			    $sql->setFetchMode(PDO::FETCH_ASSOC);
-  				} else {echo "логин не соответствует";
-				  }
-				unset($_POST["add"]);
-				echo "<a href=\"add.php\" > <br> добавить еще </a>";  
-			}
-	}
+                  РќР°Р·РІР°РЅРёРµ РєРЅРёРіРё: <input type=\"text\" name=\"title\" required=\"required\" /> <br><br>
+                  РђРІС‚РѕСЂ: <input type=\"text\" name=\"author\" required=\"required\" />  <br> <br>
+                  Р”Р°С‚Р° РїСЂРѕС‡С‚РµРЅРёСЏ:<input type=\"date\" name= \"date\" required=\"required\" /><br> <br>  
+                  РћР±Р»РѕР¶РєР°: <input type=\"file\" name= \"userfile[]\" required=\"required\" /><br> <br>
+                  С„Р°Р№Р» СЃ РєРЅРёРіРѕР№:<input type=\"file\" name=\"userfile[]\" required=\"required\"/><br> <br>
+                  Р Р°Р·СЂРµС€РёС‚СЊ СЃРєР°С‡РёРІР°РЅРёРµ: <input type=checkbox name= \"permission\"><br>
+                                    <input type=submit name=add value=\"Р”РѕР±Р°РІРёС‚СЊ\"> 
+                   </form>";
+    }  else {
+        $title = $_POST["title"];  
+        $author = $_POST["author"];
+        $date = $_POST["date"]; 
+        $login = $_SESSION["login"]; 
+        $uploaddir = $_SERVER["DOCUMENT_ROOT"];
+        $upload_cover = FileUpload($file_content = "Р¤Р°Р№Р» СЃ РѕР±Р»РѕР¶РєРѕР№:  ", $uploaddir, $login, $i=0);  
+        $upload_file = FileUpload($file_content = "Р¤Р°Р№Р» СЃ РєРЅРёРіРѕР№:  ", $uploaddir, $login, $i=1);			
+        if ($upload_cover && $upload_file) {
+            $cover = date(U).$_FILES["userfile"]["name"][0];
+            $download = date(U).$_FILES["userfile"]["name"][1];
+            if ($_POST["permission"]=="on") {
+                $permission="1"; 
+            } else {
+                $permission="0";
+            } 
+            if (!preg_match("/[^0-9A-Za-z]/",$login)) {
+                $sql = $conn->prepare("INSERT INTO book.mybooks (id, title, author, date, cover, download, permission, login) 
+                                                VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)");  
+                $sql->execute(array($title, $author, $date, $cover, $download, $permission, $login));
+                $sql->setFetchMode(PDO::FETCH_ASSOC);
+            } else {
+                echo "Р»РѕРіРёРЅ РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚";
+            }
+            unset($_POST["add"]);
+            echo "<a href=\"add.php\" > <br> РґРѕР±Р°РІРёС‚СЊ РµС‰Рµ </a>";  
+        } else {
+            unset($_POST["add"]);
+            echo "<a href=\"add.php\" > <br> РµС‰Рµ СЂР°Р· </a>"; 
+        }
+    }
 ?>
